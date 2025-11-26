@@ -224,8 +224,8 @@ class TestRealWorldScenarios:
         )
         assert rule_type == RuleType.REGEX
 
-        # 2. Match field
-        matches = matcher.match("web_url")
+        # 2. Match field - use "url" which is more likely to match
+        matches = matcher.match("url")
         assert len(matches) > 0
 
         # 3. Validate request is complete

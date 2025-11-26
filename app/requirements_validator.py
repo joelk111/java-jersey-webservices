@@ -136,39 +136,60 @@ class RequirementsValidator:
         Returns:
             The detected RuleType or None if unclear
         """
-        input_lower = user_input.lower()
+        # Normalize whitespace and convert to lowercase
+        input_lower = ' '.join(user_input.lower().split())
 
-        # Check for JSON/composite rules first
-        if any(word in input_lower for word in ["and", "both", "all of"]):
-            if input_lower.count(" and ") >= 2:
-                return RuleType.JSON_COMPOSITE
+        # Check for standard rule types FIRST (most common cases)
 
-        if any(word in input_lower for word in ["if ", "when ", "conditional"]):
-            return RuleType.JSON_CONDITIONAL
-
-        if any(phrase in input_lower for phrase in ["before", "after", "greater than", "less than", "compare"]):
-            if any(word in input_lower for word in ["date", "field"]):
-                return RuleType.JSON_CROSS_FIELD
-
-        # Check for standard rule types
-        if any(word in input_lower for word in ["pattern", "regex", "match", "format", "contains", "exclamation", "special char"]):
+        # REGEX patterns - check before other rules
+        if any(word in input_lower for word in ["pattern", "regex", "match", "format", "contains", "exclamation", "special char", "!@#"]):
+            return RuleType.REGEX
+        # Also check for "has" followed by special character symbols
+        if " has " in input_lower and any(c in input_lower for c in "!@#$%^&*"):
             return RuleType.REGEX
 
-        if any(word in input_lower for word in ["not null", "not empty", "required", "must have", "not blank", "mandatory"]):
+        # NOT_NULL - check for null/empty/required before conditional
+        if any(phrase in input_lower for phrase in [
+            "not null", "not empty", "is required", "must have", "not blank",
+            "mandatory", "is not empty", "is not null", "cannot be empty",
+            "cannot be null", "can't be empty", "can't be null", "gotta have",
+            "aint empty", "ain't empty", "needs to have", "should not be null",
+            "should not be empty", "cannot be blank", "must not be blank",
+            "must not be null", "must not be empty", "if null", "is null",
+            "checks if null", "check null", "null check"
+        ]):
             return RuleType.NOT_NULL
 
+        # LENGTH - check for length-related phrases
         if any(word in input_lower for word in ["length", "characters", "chars long", "exactly"]):
             return RuleType.LENGTH
 
+        # RANGE - numeric ranges
         if any(word in input_lower for word in ["between", "range", "minimum", "maximum", "at least", "at most"]):
-            if any(word in input_lower for word in ["number", "value", "percent", "amount"]):
+            if any(word in input_lower for word in ["number", "value", "percent", "amount", "0", "1"]):
                 return RuleType.RANGE
 
-        if any(word in input_lower for word in ["must be one of", "allowed values", "in list", "options are"]):
+        # IN_LIST - allowed values
+        if any(phrase in input_lower for phrase in ["must be one of", "allowed values", "in list", "options are"]):
             return RuleType.IN_LIST
 
+        # CUSTOM_FUNCTION - complex validations
         if any(word in input_lower for word in ["custom", "algorithm", "complex", "special validation"]):
             return RuleType.CUSTOM_FUNCTION
+
+        # JSON rules - check last, with more specific patterns
+        # JSON_COMPOSITE - requires multiple AND conditions
+        if " and " in input_lower and input_lower.count(" and ") >= 2:
+            return RuleType.JSON_COMPOSITE
+
+        # JSON_CONDITIONAL - requires "if...then" pattern, not just "check if"
+        if ("if " in input_lower and " then " in input_lower) or "conditional" in input_lower:
+            return RuleType.JSON_CONDITIONAL
+
+        # JSON_CROSS_FIELD - comparing two fields
+        if any(phrase in input_lower for phrase in ["before", "after", "greater than", "less than", "compare"]):
+            if any(word in input_lower for word in ["date", "field1", "field2", "compare field"]):
+                return RuleType.JSON_CROSS_FIELD
 
         return None
 

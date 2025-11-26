@@ -10,6 +10,10 @@ A natural language processing system for creating data quality validation rules.
 - **Multiple Output Formats**: CSV rules and JSON for complex validations
 - **Custom Function Generation**: Creates Python code for complex validations
 - **Local LLM**: Runs on Llama 3.1 8B via Ollama (no cloud API required)
+- **Question Answering**: Ask about rule types, examples, and how-to guidance
+- **Download Support**: Export generated rules as CSV or JSON files
+
+**Note**: The LLM is NOT trained - it uses in-context learning with a detailed system prompt containing rule examples and documentation.
 
 ## Quick Start
 

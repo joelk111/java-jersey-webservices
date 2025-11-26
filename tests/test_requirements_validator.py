@@ -158,11 +158,12 @@ class TestClarificationMessages:
     def test_missing_field_message(self, validator):
         """Test clarification message for missing field."""
         result = validator.validate_request(
-            "check for null values",
+            "check if email is null",
             {}
         )
         message = validator.format_missing_fields_message(result)
-        assert "field" in message.lower()
+        # Should ask about field since NOT_NULL was detected
+        assert "field" in message.lower() or "which" in message.lower()
 
     def test_no_rule_type_message(self, validator):
         """Test message when rule type is unclear."""

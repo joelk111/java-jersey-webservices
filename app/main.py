@@ -13,8 +13,9 @@ Or:
 
 import os
 import sys
+import tempfile
 import gradio as gr
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -35,7 +36,7 @@ class RulesEngineUI:
         self,
         message: str,
         history: List[Tuple[str, str]]
-    ) -> Tuple[List[Tuple[str, str]], str, str, str]:
+    ) -> Tuple[List[Tuple[str, str]], str, str, str, str]:
         """
         Process a user message and return updated state.
 
@@ -44,10 +45,10 @@ class RulesEngineUI:
             history: Chat history as list of (user, assistant) tuples
 
         Returns:
-            Tuple of (updated_history, rules_csv, generated_code, field_matches)
+            Tuple of (updated_history, rules_csv, json_rules, generated_code, field_matches)
         """
         if not message.strip():
-            return history, "", "", ""
+            return history, "", "", "", ""
 
         try:
             # Process through conversation manager
@@ -78,11 +79,18 @@ class RulesEngineUI:
                         top_match = matches[0]
                         response_parts.append(f"- '{query}' -> {top_match[0]} (score: {top_match[1]})")
 
-            # Generated rules
+            # Generated CSV rules
             if result.get("rules"):
-                response_parts.append("\n**Generated Rule(s):**")
+                response_parts.append("\n**Generated CSV Rule(s):**")
                 for rule in result["rules"]:
                     response_parts.append(f"```json\n{rule}\n```")
+
+            # Generated JSON rules
+            if result.get("json_rules"):
+                response_parts.append("\n**Generated JSON Rule(s):**")
+                for rule in result["json_rules"]:
+                    import json
+                    response_parts.append(f"```json\n{json.dumps(rule, indent=2)}\n```")
 
             # Combine response
             response = "\n".join(response_parts) if response_parts else "I'm ready to help create data quality rules. Please describe the validation you need."
@@ -90,8 +98,9 @@ class RulesEngineUI:
             # Update history
             history.append((message, response))
 
-            # Get CSV and code outputs
+            # Get CSV, JSON, and code outputs
             rules_csv = self.conversation.get_rules_csv()
+            json_rules = self.conversation.get_json_rules()
             generated_code = "\n\n".join(self.conversation.state.generated_code)
 
             # Field matches summary
@@ -103,17 +112,41 @@ class RulesEngineUI:
                         lines.append(f"{query}: {match[0]} (score: {match[1]})")
                 field_matches = "\n".join(lines)
 
-            return history, rules_csv, generated_code, field_matches
+            return history, rules_csv, json_rules, generated_code, field_matches
 
         except Exception as e:
             error_msg = f"Error processing request: {str(e)}"
             history.append((message, error_msg))
-            return history, "", "", ""
+            return history, "", "", "", ""
 
-    def clear_conversation(self) -> Tuple[List, str, str, str]:
+    def clear_conversation(self) -> Tuple[List, str, str, str, str]:
         """Reset the conversation state."""
         self.conversation.reset()
-        return [], "", "", ""
+        return [], "", "", "", ""
+
+    def download_csv(self) -> Optional[str]:
+        """Generate a downloadable CSV file."""
+        csv_content = self.conversation.get_rules_csv()
+        if not csv_content:
+            return None
+
+        # Create temp file for download
+        fd, filepath = tempfile.mkstemp(suffix=".csv", prefix="rules_")
+        with os.fdopen(fd, 'w') as f:
+            f.write(csv_content)
+        return filepath
+
+    def download_json(self) -> Optional[str]:
+        """Generate a downloadable JSON file."""
+        json_content = self.conversation.get_json_rules()
+        if not json_content:
+            return None
+
+        # Create temp file for download
+        fd, filepath = tempfile.mkstemp(suffix=".json", prefix="rules_")
+        with os.fdopen(fd, 'w') as f:
+            f.write(json_content)
+        return filepath
 
     def search_fields(self, query: str) -> str:
         """Search for fields matching a query."""
@@ -149,12 +182,17 @@ class RulesEngineUI:
             # NLP Data Quality Rules Engine
 
             Create data quality rules using natural language. Describe the validation
-            you need, and the system will generate the corresponding rule in CSV format.
+            you need, and the system will generate the corresponding rule in CSV or JSON format.
 
             **Examples:**
             - "Create a rule for web_url that checks if it contains exclamation points and fail the test"
             - "Validate that email addresses have proper format"
             - "Ensure BVD ID numbers are not empty and start with a 2-letter country code"
+
+            **You can also ask questions like:**
+            - "What rule types are supported?"
+            - "How do I create a composite rule?"
+            - "Show me an example of a RANGE validation"
             """)
 
             with gr.Row():
@@ -168,7 +206,7 @@ class RulesEngineUI:
                     with gr.Row():
                         msg_input = gr.Textbox(
                             label="Your message",
-                            placeholder="Describe the rule you want to create...",
+                            placeholder="Describe the rule you want to create or ask a question...",
                             lines=2,
                             scale=4
                         )
@@ -191,10 +229,22 @@ class RulesEngineUI:
                     rules_output = gr.Code(
                         label="Rules CSV",
                         language="csv",
-                        lines=10
+                        lines=8
                     )
-                    download_csv = gr.Button("Download CSV")
+                    csv_download = gr.File(label="Download CSV", visible=False)
+                    download_csv_btn = gr.Button("Download CSV")
 
+                with gr.Column():
+                    gr.Markdown("### Generated Rules (JSON)")
+                    json_output = gr.Code(
+                        label="JSON Rules",
+                        language="json",
+                        lines=8
+                    )
+                    json_download = gr.File(label="Download JSON", visible=False)
+                    download_json_btn = gr.Button("Download JSON")
+
+            with gr.Row():
                 with gr.Column():
                     gr.Markdown("### Generated Code")
                     code_output = gr.Code(
@@ -216,7 +266,7 @@ class RulesEngineUI:
             submit_btn.click(
                 fn=self.process_message,
                 inputs=[msg_input, chatbot],
-                outputs=[chatbot, rules_output, code_output, field_matches_output]
+                outputs=[chatbot, rules_output, json_output, code_output, field_matches_output]
             ).then(
                 fn=lambda: "",
                 outputs=[msg_input]
@@ -225,7 +275,7 @@ class RulesEngineUI:
             msg_input.submit(
                 fn=self.process_message,
                 inputs=[msg_input, chatbot],
-                outputs=[chatbot, rules_output, code_output, field_matches_output]
+                outputs=[chatbot, rules_output, json_output, code_output, field_matches_output]
             ).then(
                 fn=lambda: "",
                 outputs=[msg_input]
@@ -233,13 +283,23 @@ class RulesEngineUI:
 
             clear_btn.click(
                 fn=self.clear_conversation,
-                outputs=[chatbot, rules_output, code_output, field_matches_output]
+                outputs=[chatbot, rules_output, json_output, code_output, field_matches_output]
             )
 
             field_search.submit(
                 fn=self.search_fields,
                 inputs=[field_search],
                 outputs=[field_results]
+            )
+
+            download_csv_btn.click(
+                fn=self.download_csv,
+                outputs=[csv_download]
+            )
+
+            download_json_btn.click(
+                fn=self.download_json,
+                outputs=[json_download]
             )
 
         return interface

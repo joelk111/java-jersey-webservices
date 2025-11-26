@@ -271,6 +271,16 @@ System generates:
 python -m pytest tests/ -v
 ```
 
+### Test Files
+
+| Test File | Description |
+|-----------|-------------|
+| `test_field_matcher.py` | Fuzzy field matching (17 tests) |
+| `test_rule_generator.py` | Rule creation and saving (14 tests) |
+| `test_requirements_validator.py` | Required field detection (16 tests) |
+| `test_qa_imperfect_prompts.py` | Typos/informal language (35 tests) |
+| `test_integration.py` | End-to-end workflows (23 tests) |
+
 ### Run Specific Tests
 
 ```bash
@@ -282,6 +292,9 @@ python -m pytest tests/test_rule_generator.py -v
 
 # QA tests with imperfect prompts
 python -m pytest tests/test_qa_imperfect_prompts.py -v
+
+# Integration tests
+python -m pytest tests/test_integration.py -v
 ```
 
 ### Coverage Report

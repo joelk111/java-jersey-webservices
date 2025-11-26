@@ -16,8 +16,9 @@ from app.rule_generator import RuleGenerator, Rule
 @pytest.fixture
 def generator():
     """Create a RuleGenerator instance with temp output directory."""
+    from pathlib import Path
     gen = RuleGenerator()
-    gen.output_dir = tempfile.mkdtemp()
+    gen.output_dir = Path(tempfile.mkdtemp())
     return gen
 
 
