@@ -10,3 +10,34 @@
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.env
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Output directories
+generated_rules/
+custom_functions/
+logs/
+htmlcov/
+.pytest_cache/
+.coverage
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # Ollama LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nlp-rules-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Model initialization service (one-time setup)
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: nlp-rules-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        echo 'Waiting for Ollama to be ready...' &&
+        sleep 10 &&
+        ollama pull llama3.1:8b-instruct-q4_0 &&
+        echo 'Model downloaded successfully!'
+      "
+    environment:
+      - OLLAMA_HOST=ollama:11434
+
+  # NLP Rules Engine Application
+  nlp-rules-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nlp-rules-app
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./generated_rules:/app/output/rules
+      - ./custom_functions:/app/output/functions
+      - ./logs:/app/logs
+    environment:
+      - ENVIRONMENT=production
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=llama3.1:8b-instruct-q4_0
+      - APP_HOST=0.0.0.0
+      - APP_PORT=7860
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - FIELD_DICTIONARY_PATH=/app/data/orbis_field_names.c
+      - RULES_OUTPUT_DIR=/app/output/rules
+      - CUSTOM_FUNCTIONS_DIR=/app/output/functions
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  ollama_data:
+    driver: local
+
+networks:
+  default:
+    name: nlp-rules-network

@@ -1,0 +1,49 @@
+version: '3.8'
+
+# Development Docker Compose Configuration
+# Usage: docker-compose -f docker-compose.dev.yml up
+
+services:
+  # Ollama LLM Service (Development)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nlp-rules-ollama-dev
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data_dev:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+
+  # NLP Rules Engine Application (Development)
+  nlp-rules-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: nlp-rules-app-dev
+    ports:
+      - "7860:7860"
+    volumes:
+      # Mount source code for hot-reloading
+      - ./app:/app/app
+      - ./config:/app/config
+      - ./orbis_field_names.c:/app/data/orbis_field_names.c
+      - ./generated_rules:/app/output/rules
+      - ./custom_functions:/app/output/functions
+      - ./logs:/app/logs
+    environment:
+      - ENVIRONMENT=development
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=llama3.1:8b-instruct-q4_0
+      - APP_HOST=0.0.0.0
+      - APP_PORT=7860
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data_dev:
+    driver: local
