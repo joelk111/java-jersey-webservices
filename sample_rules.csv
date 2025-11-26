@@ -1,0 +1,16 @@
+rule_id,rule_name,rule_type,field_name,validation_type,validation_value,error_message,severity,is_active
+R001,BVD_ID_Format_Check,REGEX,bvd_id_number,"^[A-Z]{2}[A-Z0-9]+$",,BVD ID must start with 2 letter country code followed by alphanumeric,ERROR,TRUE
+R002,Email_Format_Validation,REGEX,email_address,"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",,Invalid email format,ERROR,TRUE
+R003,URL_No_Exclamation,REGEX,web_url,"^[^!]*$",,URL should not contain exclamation points,WARNING,TRUE
+R004,Country_ISO_Code_Length,LENGTH,country_iso_code,2,2,Country ISO code must be exactly 2 characters,ERROR,TRUE
+R005,Postcode_Not_Empty,NOT_NULL,postcode,,,Postcode is required,WARNING,TRUE
+R006,Phone_Format,REGEX,telephone_number,"^\+?[0-9\s\-\(\)]+$",,Invalid phone number format,WARNING,TRUE
+R007,Date_Format_Check,REGEX,date_established,"^\d{4}-\d{2}-\d{2}$",,Date must be in YYYY-MM-DD format,ERROR,TRUE
+R008,Numeric_Range_Check,RANGE,number_of_employees,0,10000000,Number of employees must be between 0 and 10 million,ERROR,TRUE
+R009,Percentage_Range,RANGE,shareholder_total_,0,100,Percentage must be between 0 and 100,ERROR,TRUE
+R010,Custom_BVD_Validation,CUSTOM_FUNCTION,bvd_id_number,validate_bvd_checksum,,BVD ID checksum validation failed,ERROR,TRUE
+R011,URL_Protocol_Check,REGEX,web_url,"^https?://",,URL must start with http:// or https://,WARNING,TRUE
+R012,Name_No_Special_Chars,REGEX,company_name,"^[a-zA-Z0-9\s\.\,\-\&\(\)\']+$",,Company name contains invalid special characters,WARNING,TRUE
+R013,Revenue_Positive,RANGE,operating_revenue,0,999999999999,Revenue must be a positive number,ERROR,TRUE
+R014,Year_Valid_Range,RANGE,date_established_year,1800,2025,Year must be between 1800 and current year,ERROR,TRUE
+R015,Status_Allowed_Values,IN_LIST,registration_status,"Active,Inactive,Pending,Dissolved,Merged",,Invalid registration status,ERROR,TRUE
