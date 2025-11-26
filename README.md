@@ -12,8 +12,10 @@ A natural language processing system for creating data quality validation rules.
 - **Local LLM**: Runs on Llama 3.1 8B via Ollama (no cloud API required)
 - **Question Answering**: Ask about rule types, examples, and how-to guidance
 - **Download Support**: Export generated rules as CSV or JSON files
+- **LoRA Fine-tuning**: Optional training to improve domain accuracy
+- **EKS Deployment**: Kubernetes manifests for AWS deployment
 
-**Note**: The LLM is NOT trained - it uses in-context learning with a detailed system prompt containing rule examples and documentation.
+**Note**: The LLM uses in-context learning by default. Optional LoRA fine-tuning can improve accuracy for your specific rules.
 
 ## Quick Start
 
@@ -69,12 +71,27 @@ System: I can create a NOT_NULL rule, but which field should be required?
 | Python | 3.10 | 3.11+ |
 | Storage | 10 GB | 20 GB |
 
+## Optional: Fine-tune the LLM
+
+For better accuracy on your specific rules, you can fine-tune the model:
+
+```bash
+# Train locally (requires GPU)
+./training/train_and_deploy.sh --train --local
+
+# Or train and deploy to AWS EKS
+./training/train_and_deploy.sh --train --deploy --ecr-repo YOUR_ECR_REPO
+```
+
+See [Training & Deployment Guide](docs/05_TRAINING_DEPLOYMENT.md) for details.
+
 ## Documentation
 
 - [System Overview](docs/01_SYSTEM_OVERVIEW.md)
 - [Installation Guide](docs/02_INSTALLATION_SETUP.md)
 - [Development Guide](docs/DEVELOPER_GUIDE.md)
 - [Testing & QA](docs/04_TESTING_QA.md)
+- [Training & Deployment](docs/05_TRAINING_DEPLOYMENT.md)
 - [Rules FAQ](RULES_FAQ.md)
 
 ## Rule Types Supported
@@ -93,12 +110,17 @@ System: I can create a NOT_NULL rule, but which field should be required?
 ```
 ├── app/                    # Application code
 ├── config/                 # Environment configs
-├── tests/                  # Test suite
+├── tests/                  # Test suite (105 tests)
+├── training/               # LoRA fine-tuning scripts
+│   ├── train_lora.py       # Training script
+│   ├── export_to_ollama.py # Model export
+│   └── Dockerfile.train    # Training container
+├── k8s/                    # Kubernetes manifests for EKS
 ├── scripts/                # Setup scripts
 ├── docs/                   # Documentation
 ├── Dockerfile              # Production image
 ├── docker-compose.yml      # Docker deployment
-├── orbis_field_names.c     # Field dictionary
+├── orbis_field_names.c     # Field dictionary (5,095 fields)
 └── requirements.txt        # Dependencies
 ```
 

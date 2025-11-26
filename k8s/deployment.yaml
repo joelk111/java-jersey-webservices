@@ -1,0 +1,110 @@
+# NLP Rules Engine Deployment for AWS EKS
+#
+# Prerequisites:
+# 1. EKS cluster with GPU nodes (g4dn.xlarge recommended)
+# 2. NVIDIA device plugin installed
+# 3. Docker image pushed to ECR
+#
+# Deploy:
+#   kubectl apply -f k8s/
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rules-engine
+  namespace: rules-engine
+  labels:
+    app: rules-engine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rules-engine
+  template:
+    metadata:
+      labels:
+        app: rules-engine
+    spec:
+      # Use GPU node
+      nodeSelector:
+        node.kubernetes.io/instance-type: g4dn.xlarge
+
+      # Tolerate GPU taint
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+
+      containers:
+      - name: rules-engine
+        image: ${ECR_REPO}/rules-engine:latest
+        imagePullPolicy: Always
+
+        ports:
+        - name: gradio
+          containerPort: 7860
+        - name: ollama
+          containerPort: 11434
+
+        # Request GPU
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: "16Gi"
+            cpu: "4"
+          requests:
+            nvidia.com/gpu: 1
+            memory: "8Gi"
+            cpu: "2"
+
+        # Environment variables
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: OLLAMA_HOST
+          value: "http://localhost:11434"
+        - name: OLLAMA_MODEL
+          value: "rules-llama"  # Use fine-tuned model
+        - name: APP_HOST
+          value: "0.0.0.0"
+        - name: APP_PORT
+          value: "7860"
+        - name: DEBUG
+          value: "false"
+
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 7860
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 7860
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+
+        # Volume mounts
+        volumeMounts:
+        - name: model-storage
+          mountPath: /root/.ollama
+        - name: rules-output
+          mountPath: /app/generated_rules
+
+      volumes:
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: model-storage-pvc
+      - name: rules-output
+        persistentVolumeClaim:
+          claimName: rules-output-pvc
+
+      # Image pull secret for ECR
+      imagePullSecrets:
+      - name: ecr-credentials

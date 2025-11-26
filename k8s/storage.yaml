@@ -1,0 +1,46 @@
+# Persistent storage for models and generated rules
+#
+# Uses EBS gp3 storage class (standard for EKS)
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  fsType: ext4
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+
+---
+
+# Storage for Ollama models (including fine-tuned model)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-storage-pvc
+  namespace: rules-engine
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+
+# Storage for generated rules
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rules-output-pvc
+  namespace: rules-engine
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 5Gi
