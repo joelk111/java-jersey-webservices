@@ -1,0 +1,107 @@
+# Dockerfile for Inference (Local or EKS deployment)
+# This image includes Ollama + the fine-tuned model + the Rules Engine app
+#
+# Build (after training):
+#   docker build -f training/Dockerfile.inference -t rules-engine:latest .
+#
+# Run locally:
+#   docker run -p 7860:7860 -p 11434:11434 --gpus all rules-engine:latest
+#
+# Push to ECR for EKS:
+#   aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_REPO
+#   docker tag rules-engine:latest $ECR_REPO/rules-engine:latest
+#   docker push $ECR_REPO/rules-engine:latest
+
+FROM nvidia/cuda:12.1-runtime-ubuntu22.04
+
+# Set environment
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV OLLAMA_HOST=0.0.0.0
+ENV OLLAMA_MODELS=/root/.ollama/models
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.11 \
+    python3-pip \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.11 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Install Python dependencies for the app
+RUN pip install --no-cache-dir \
+    gradio>=4.0.0 \
+    httpx>=0.25.0 \
+    rapidfuzz>=3.0.0 \
+    python-dotenv>=1.0.0
+
+# Create app directory
+WORKDIR /app
+
+# Copy application code
+COPY app/ /app/app/
+COPY config/ /app/config/
+COPY orbis_field_names.c /app/
+COPY sample_rules.csv /app/
+COPY sample_rules_json.csv /app/
+COPY rules.py /app/
+
+# Copy the fine-tuned model (if exists)
+# This should be built after training completes
+COPY training/ollama_export/ /app/model/ 2>/dev/null || true
+
+# Create startup script
+RUN cat > /app/start.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "Starting Ollama server..."
+ollama serve &
+OLLAMA_PID=$!
+
+# Wait for Ollama to be ready
+echo "Waiting for Ollama to start..."
+for i in {1..30}; do
+    if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+        echo "Ollama is ready!"
+        break
+    fi
+    sleep 1
+done
+
+# Check if custom model exists
+if [ -f "/app/model/Modelfile" ]; then
+    echo "Loading fine-tuned model..."
+    cd /app/model
+    ollama create rules-llama -f Modelfile
+    export OLLAMA_MODEL=rules-llama
+    echo "Fine-tuned model loaded: rules-llama"
+else
+    echo "No fine-tuned model found, using base model..."
+    ollama pull llama3.1:8b-instruct-q4_0
+    export OLLAMA_MODEL=llama3.1:8b-instruct-q4_0
+fi
+
+echo "Starting NLP Rules Engine..."
+cd /app
+python -m app.main
+EOF
+
+RUN chmod +x /app/start.sh
+
+# Expose ports
+EXPOSE 7860 11434
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:7860/ || exit 1
+
+# Start services
+CMD ["/app/start.sh"]

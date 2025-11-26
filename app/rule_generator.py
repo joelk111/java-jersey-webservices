@@ -32,7 +32,12 @@ class RuleGenerator:
 
     def __init__(self):
         """Initialize the rule generator."""
-        self.output_dir = Path(config.rules_output_dir)
+        # Ensure output_dir is always a Path object
+        output_dir_str = config.rules_output_dir
+        if isinstance(output_dir_str, Path):
+            self.output_dir = output_dir_str
+        else:
+            self.output_dir = Path(str(output_dir_str))
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._rule_counter = 0
 
